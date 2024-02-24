@@ -17,6 +17,8 @@ export ZONEFILES="/var/lib/named"
 export DEFAULTPATH="etc/sysconfig"
 export SHIM_FOLDER="/usr/share/efi/*/"
 export SHIM_FILE="shim\.efi"
+export SECURE_BOOT_FOLDER="/usr/share/efi/*/"
+export SECURE_BOOT_FILE="grub\.efi"
 export IPXE_FOLDER="/usr/share/ipxe/"
 export PXELINUX_FOLDER="/usr/share/syslinux"
 export MEMDISK_FOLDER="/usr/share/syslinux"
@@ -24,7 +26,7 @@ export SYSLINUX_DIR="/usr/share/syslinux"
 export GRUB_MOD_FOLDER="/usr/share/grub2"
 
 # First parameter is DISTRO if provided
-[ $# -ge 2 ] && DISTRO="$1"
+[ $# -ge 1 ] && DISTRO="$1"
 
 if [ "$DISTRO" = "" ] && [ -r /etc/os-release ];then
     source /etc/os-release
@@ -55,6 +57,8 @@ elif [ "$DISTRO" = "UBUNTU" ];then
     export DEFAULTPATH="etc/default"
     export SHIM_FOLDER="/usr/lib/shim/"
     export SHIM_FILE="shim.*\.efi\.signed"
+    export SECURE_BOOT_FOLDER="/usr/lib/shim/"
+    export SECURE_BOOT_FILE="grub[a-zA-Z0-9]*\.efi"
     export IPXE_FOLDER="/usr/lib/ipxe/"
     export PXELINUX_FOLDER="/usr/lib/PXELINUX/"
     export MEMDISK_FOLDER="/usr/lib/syslinux/"
@@ -74,6 +78,8 @@ elif [ "$DISTRO" = "FEDORA" ];then
     export ZONEFILES="/var/named"
     export SHIM_FOLDER="/boot/efi/EFI/*/"
     export SHIM_FILE="shim[a-zA-Z0-9]*\.efi"
+    export SECURE_BOOT_FOLDER="/boot/efi/EFI/*/"
+    export SECURE_BOOT_FILE="grub\.efi"
     export GRUB_MOD_FOLDER="/usr/lib/grub"
 else
     echo "ERROR, unknown distro $DISTRO"

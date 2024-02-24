@@ -133,6 +133,8 @@ syslinux_pxelinux_folder: '/usr/share/syslinux'
 grub2_mod_dir: '/usr/share/grub2'
 bootloaders_shim_folder: '/usr/share/efi/*/'
 bootloaders_shim_file: 'shim\.efi'
+secure_boot_grub_folder: '/usr/share/efi/*/'
+secure_boot_grub_file: 'grub\.efi'
 bootloaders_ipxe_folder: '/usr/share/ipxe/'
 
 # Email out a report when Cobbler finishes installing a system.
@@ -259,14 +261,6 @@ ldap_tls_certfile: ''
 ldap_tls_cacertdir: ''
 ldap_tls_cipher_suite: ''
 ldap_tls_reqcert: ''
-
-# Cobbler has a feature that allows for integration with config management
-# systems such as Puppet.  The following parameters work in conjunction with
-# --mgmt-classes  and are described in further detail at:
-# https://github.com/cobbler/cobbler/wiki/Using-cobbler-with-a-configuration-management-system
-mgmt_classes: []
-mgmt_parameters:
- from_cobbler: true
 
 # if enabled, this setting ensures that puppet is installed during
 # machine provision, a client certificate is generated and a

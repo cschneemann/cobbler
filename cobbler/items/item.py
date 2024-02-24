@@ -14,6 +14,9 @@ V3.4.0 (unreleased):
         * ``logical_parent`` was added.
         * ``get_parent()`` was added which returns the internal reference that is used to return the object of the
           ``parent`` property.
+    * Removed:
+        * mgmt_classes
+        * mgmt_parameters
 V3.3.4 (unreleased):
     * No changes
 V3.3.3:
@@ -105,13 +108,14 @@ import pprint
 import re
 import uuid
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 import yaml
 
 from cobbler import enums, utils
 from cobbler.cexceptions import CX
 from cobbler.decorator import InheritableDictProperty, InheritableProperty, LazyProperty
+from cobbler.items.abstract.item_cache import ItemCache
 from cobbler.utils import input_converters
 
 if TYPE_CHECKING:
@@ -125,71 +129,7 @@ if TYPE_CHECKING:
 
 
 RE_OBJECT_NAME = re.compile(r"[a-zA-Z0-9_\-.:]*$")
-
-
-class ItemCache:
-    """
-    A Cobbler ItemCache object.
-    """
-
-    def __init__(self, api: "CobblerAPI"):
-        """
-        Constructor
-
-        Generalized parameterized cache format:
-           cache_key        cache_value
-         {(P1, P2, .., Pn): value}
-        where P1, .., Pn are cache parameters
-
-        Parameterized cache for to_dict(resolved: bool).
-        The values of the resolved parameter are the key for the Dict.
-        In the to_dict case, there is only one cache parameter and only two key values:
-         {True:  cache_value or None,
-          False: cache_value or None}
-        """
-        self._cached_dict: Dict[bool, Optional[Dict[str, Any]]] = {
-            True: None,
-            False: None,
-        }
-
-        self.api = api
-        self.settings = api.settings()
-
-    def get_dict_cache(self, resolved: bool) -> Optional[Dict[str, Any]]:
-        """
-        Gettinging the dict cache.
-
-        :param resolved: "resolved" parameter for Item.to_dict().
-        :return: The cache value for the object, or None if not set.
-        """
-        if self.settings.cache_enabled:
-            return self._cached_dict[resolved]
-        return None
-
-    def set_dict_cache(self, value: Optional[Dict[str, Any]], resolved: bool):
-        """
-        Setter for the dict cache.
-
-        :param value: Sets the value for the dict cache.
-        :param resolved: "resolved" parameter for Item.to_dict().
-        """
-        if self.settings.cache_enabled:
-            self._cached_dict[resolved] = value
-
-    def clean_dict_cache(self):
-        """
-        Cleaninig the dict cache.
-        """
-        if self.settings.cache_enabled:
-            self.set_dict_cache(None, True)
-            self.set_dict_cache(None, False)
-
-    def clean_cache(self):
-        """
-        Cleaninig the Item cache.
-        """
-        if self.settings.cache_enabled:
-            self.clean_dict_cache()
+T = TypeVar("T")
 
 
 class Item:
@@ -205,18 +145,6 @@ class Item:
     # Used to determine descendants and cache invalidation.
     # Format: {"Item Type": [("Dependent Item Type", "Dependent Type attribute"), ..], [..]}
     TYPE_DEPENDENCIES: Dict[str, List[Tuple[str, str]]] = {
-        "package": [
-            ("mgmtclass", "packages"),
-        ],
-        "file": [
-            ("mgmtclass", "files"),
-            ("image", "file"),
-        ],
-        "mgmtclass": [
-            ("distro", "mgmt_classes"),
-            ("profile", "mgmt_classes"),
-            ("system", "mgmt_classes"),
-        ],
         "repo": [
             ("profile", "repos"),
         ],
@@ -395,8 +323,6 @@ class Item:
         self._last_cached_mtime = 0
         self._owners: Union[List[Any], str] = enums.VALUE_INHERITED
         self._cache: ItemCache = ItemCache(api)
-        self._mgmt_classes: Union[List[Any], str] = enums.VALUE_INHERITED
-        self._mgmt_parameters: Union[Dict[Any, Any], str] = {}
         self._is_subobject = is_subobject
         self._inmemory = True
 
@@ -444,17 +370,7 @@ class Item:
             self.clean_cache(name)
         super().__setattr__(name, value)
 
-    def _resolve(self, property_name: str) -> Any:
-        """
-        Resolve the ``property_name`` value in the object tree. This function traverses the tree from the object to its
-        topmost parent and returns the first value that is not inherited. If the the tree does not contain a value the
-        settings are consulted.
-
-        :param property_name: The property name to resolve.
-        :raises AttributeError: In case one of the objects try to inherit from a parent that does not have
-                                ``property_name``.
-        :return: The resolved value.
-        """
+    def __common_resolve(self, property_name: str):
         settings_name = property_name
         if property_name.startswith("proxy_url_"):
             property_name = "proxy"
@@ -462,25 +378,44 @@ class Item:
             settings_name = "default_ownership"
         attribute = "_" + property_name
 
-        if not hasattr(self, attribute):
-            raise AttributeError(
-                f'{type(self)} "{self.name}" does not have property "{property_name}"'
-            )
+        return getattr(self, attribute), settings_name
 
-        attribute_value = getattr(self, attribute)
+    def __resolve_get_parent_or_settings(self, property_name: str, settings_name: str):
         settings = self.api.settings()
+        conceptual_parent = self.get_conceptual_parent()
+
+        if hasattr(self.parent, property_name):
+            return getattr(self.parent, property_name)
+        elif hasattr(conceptual_parent, property_name):
+            return getattr(conceptual_parent, property_name)
+        elif hasattr(settings, settings_name):
+            return getattr(settings, settings_name)
+        elif hasattr(settings, f"default_{settings_name}"):
+            return getattr(settings, f"default_{settings_name}")
+        return None
+
+    def _resolve(self, property_name: str) -> Any:
+        """
+        Resolve the ``property_name`` value in the object tree. This function traverses the tree from the object to its
+        topmost parent and returns the first value that is not inherited. If the tree does not contain a value the
+        settings are consulted.
+
+        :param property_name: The property name to resolve.
+        :raises AttributeError: In case one of the objects try to inherit from a parent that does not have
+                                ``property_name``.
+        :return: The resolved value.
+        """
+        attribute_value, settings_name = self.__common_resolve(property_name)
 
         if attribute_value == enums.VALUE_INHERITED:
-            logical_parent = self.logical_parent
-            if logical_parent is not None and hasattr(logical_parent, property_name):
-                return getattr(logical_parent, property_name)
-            if hasattr(settings, settings_name):
-                return getattr(settings, settings_name)
-            if hasattr(settings, f"default_{settings_name}"):
-                return getattr(settings, f"default_{settings_name}")
-            AttributeError(
+            possible_return = self.__resolve_get_parent_or_settings(
+                property_name, settings_name
+            )
+            if possible_return is not None:
+                return possible_return
+            raise AttributeError(
                 f'{type(self)} "{self.name}" inherits property "{property_name}", but neither its parent nor'
-                f"settings have it"
+                f" settings have it"
             )
 
         return attribute_value
@@ -491,31 +426,17 @@ class Item:
         """
         See :meth:`~cobbler.items.item.Item._resolve`
         """
-        settings_name = property_name
-        attribute = "_" + property_name
-
-        if not hasattr(self, attribute):
-            raise AttributeError(
-                f'{type(self)} "{self.name}" does not have property "{property_name}"'
+        attribute_value, settings_name = self.__common_resolve(property_name)
+        unwrapped_value = getattr(attribute_value, "value", "")
+        if unwrapped_value == enums.VALUE_INHERITED:
+            possible_return = self.__resolve_get_parent_or_settings(
+                unwrapped_value, settings_name
             )
-
-        attribute_value = getattr(self, attribute)
-        settings = self.api.settings()
-
-        if (
-            isinstance(attribute_value, enums.ConvertableEnum)
-            and attribute_value.value == enums.VALUE_INHERITED
-        ):
-            logical_parent = self.logical_parent
-            if logical_parent is not None and hasattr(logical_parent, property_name):
-                return getattr(logical_parent, property_name)
-            if hasattr(settings, settings_name):
-                return enum_type.to_enum(getattr(settings, settings_name))
-            if hasattr(settings, f"default_{settings_name}"):
-                return enum_type.to_enum(getattr(settings, f"default_{settings_name}"))
-            AttributeError(
+            if possible_return is not None:
+                return enum_type(possible_return)
+            raise AttributeError(
                 f'{type(self)} "{self.name}" inherits property "{property_name}", but neither its parent nor'
-                "settings have it"
+                f" settings have it"
             )
 
         return attribute_value
@@ -531,19 +452,14 @@ class Item:
         """
         attribute = "_" + property_name
 
-        if not hasattr(self, attribute):
-            raise AttributeError(
-                f'{type(self)} "{self.name}" does not have property "{property_name}"'
-            )
-
         attribute_value = getattr(self, attribute)
         settings = self.api.settings()
 
         merged_dict: Dict[str, Any] = {}
 
-        logical_parent = self.logical_parent
-        if logical_parent is not None and hasattr(logical_parent, property_name):
-            merged_dict.update(getattr(logical_parent, property_name))
+        conceptual_parent = self.get_conceptual_parent()
+        if hasattr(conceptual_parent, property_name):
+            merged_dict.update(getattr(conceptual_parent, property_name))
         elif hasattr(settings, property_name):
             merged_dict.update(getattr(settings, property_name))
 
@@ -552,6 +468,39 @@ class Item:
 
         utils.dict_annihilate(merged_dict)
         return merged_dict
+
+    def _deduplicate_dict(
+        self, property_name: str, value: Dict[str, T]
+    ) -> Dict[str, T]:
+        """
+        Filter out the key:value pair may come from parent and global settings.
+        Note: we do not know exactly which resolver does key:value belongs to, what we did is just deduplicate them.
+
+        :param property_name: The property name to deduplicated.
+        :param value: The value that should be deduplicated.
+        :returns: The deduplicated dictionary
+        """
+        _, settings_name = self.__common_resolve(property_name)
+        settings = self.api.settings()
+        conceptual_parent = self.get_conceptual_parent()
+
+        if hasattr(self.parent, property_name):
+            parent_value = getattr(self.parent, property_name)
+        elif hasattr(conceptual_parent, property_name):
+            parent_value = getattr(conceptual_parent, property_name)
+        elif hasattr(settings, settings_name):
+            parent_value = getattr(settings, settings_name)
+        elif hasattr(settings, f"default_{settings_name}"):
+            parent_value = getattr(settings, f"default_{settings_name}")
+        else:
+            parent_value = {}
+
+        # Because we use getattr pyright cannot correctly check this.
+        for key in parent_value:  # type: ignore
+            if key in value and parent_value[key] == value[key]:  # type: ignore
+                value.pop(key)  # type: ignore
+
+        return value
 
     @property
     def uid(self) -> str:
@@ -699,11 +648,14 @@ class Item:
         :raises ValueError: In case the values set could not be parsed successfully.
         """
         try:
-            self._kernel_options = input_converters.input_string_or_dict(
-                options, allow_multiples=True
-            )
+            value = input_converters.input_string_or_dict(options, allow_multiples=True)
+            if value == enums.VALUE_INHERITED:
+                self._kernel_options = enums.VALUE_INHERITED
+                return
+            # pyright doesn't understand that the only valid str return value is this constant.
+            self._kernel_options = self._deduplicate_dict("kernel_options", value)  # type: ignore
         except TypeError as error:
-            raise TypeError("invalid kernel options") from error
+            raise TypeError("invalid kernel value") from error
 
     @InheritableDictProperty
     def kernel_options_post(self) -> Dict[str, Any]:
@@ -754,67 +706,11 @@ class Item:
         :raises ValueError: If splitting the value does not succeed.
         """
         value = input_converters.input_string_or_dict(options, allow_multiples=True)
-        self._autoinstall_meta = value
-
-    @InheritableProperty
-    def mgmt_classes(self) -> List[Any]:
-        """
-        Assigns a list of configuration management classes that can be assigned to any object, such as those used by
-        Puppet's external_nodes feature.
-
-        .. note:: This property can be set to ``<<inherit>>``.
-
-        :getter: An empty list or the list of mgmt_classes.
-        :setter: Will split this according to :meth:`~cobbler.utils.input_string_or_list`.
-        """
-        return self._resolve("mgmt_classes")
-
-    @mgmt_classes.setter  # type: ignore[no-redef]
-    def mgmt_classes(self, mgmt_classes: Union[List[Any], str]):
-        """
-        Setter for the ``mgmt_classes`` property.
-
-        :param mgmt_classes: The new options for the management classes of an item.
-        """
-        if not isinstance(mgmt_classes, (str, list)):  # type: ignore
-            raise TypeError("mgmt_classes has to be either str or list")
-        self._mgmt_classes = input_converters.input_string_or_list(mgmt_classes)
-
-    @InheritableDictProperty
-    def mgmt_parameters(self) -> Dict[Any, Any]:
-        """
-        Parameters which will be handed to your management application (Must be a valid YAML dictionary)
-
-        .. note:: This property can be set to ``<<inherit>>``.
-
-        :getter: The mgmt_parameters or an empty dict.
-        :setter: A YAML string which can be assigned to any object, this is used by Puppet's external_nodes feature.
-        """
-        return self._resolve_dict("mgmt_parameters")
-
-    @mgmt_parameters.setter  # type: ignore[no-redef]
-    def mgmt_parameters(self, mgmt_parameters: Union[str, Dict[Any, Any]]):
-        """
-        A YAML string which can be assigned to any object, this is used by Puppet's external_nodes feature.
-
-        :param mgmt_parameters: The management parameters for an item.
-        :raises TypeError: In case the parsed YAML isn't of type dict afterwards.
-        """
-        if not isinstance(mgmt_parameters, (str, dict)):  # type: ignore
-            raise TypeError("mgmt_parameters must be of type str or dict")
-        if isinstance(mgmt_parameters, str):
-            if mgmt_parameters == enums.VALUE_INHERITED:
-                self._mgmt_parameters = enums.VALUE_INHERITED
-                return
-            if mgmt_parameters == "":
-                self._mgmt_parameters = {}
-                return
-            mgmt_parameters = yaml.safe_load(mgmt_parameters)
-            if not isinstance(mgmt_parameters, dict):
-                raise TypeError(
-                    "Input YAML in Puppet Parameter field must evaluate to a dictionary."
-                )
-        self._mgmt_parameters = mgmt_parameters
+        if value == enums.VALUE_INHERITED:
+            self._autoinstall_meta = enums.VALUE_INHERITED
+            return
+        # pyright doesn't understand that the only valid str return value is this constant.
+        self._autoinstall_meta = self._deduplicate_dict("autoinstall_meta", value)  # type: ignore
 
     @LazyProperty
     def template_files(self) -> Dict[Any, Any]:

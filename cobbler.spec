@@ -143,6 +143,7 @@ BuildRequires:  python%{python3_pkgversion}-distro
 BuildRequires:  python%{python3_pkgversion}-setuptools
 BuildRequires:  python%{python3_pkgversion}-netaddr
 BuildRequires:  python%{python3_pkgversion}-schema
+BuildRequires:  python%{python3_pkgversion}-systemd
 BuildRequires:  %{py3_module_cheetah}
 BuildRequires:  %{py3_module_sphinx}
 %if 0%{?suse_version}
@@ -184,6 +185,7 @@ Requires:       %{py3_module_pyyaml}
 Requires:       python%{python3_pkgversion}-requests
 Requires:       python%{python3_pkgversion}-distro
 Requires:       python%{python3_pkgversion}-schema
+Requires:       python%{python3_pkgversion}-systemd
 Requires:       python%{python3_pkgversion}-gunicorn
 Requires:       %{py3_module_file}
 %if 0%{?suse_version}
@@ -239,7 +241,11 @@ Dockerfiles and scripts to setup testing containers
 %setup
 
 %build
+%if 0%{?fedora} || 0%{?rhel}
+. distro_build_configs.sh FEDORA
+%else
 . distro_build_configs.sh
+%endif
 
 # Check distro specific variables for consistency
 [ "${DOCPATH}" != %{_mandir} ] && echo "ERROR: DOCPATH: ${DOCPATH} does not match %{_mandir}"
@@ -258,7 +264,11 @@ Dockerfiles and scripts to setup testing containers
 make man
 
 %install
+%if 0%{?fedora} || 0%{?rhel}
+. distro_build_configs.sh FEDORA
+%else
 . distro_build_configs.sh
+%endif
 %py3_install
 
 # cobbler
@@ -337,6 +347,7 @@ chgrp %{apache_group} %{_sysconfdir}/cobbler/settings.yaml
 %config(noreplace) %{_sysconfdir}/cobbler/import_rsync_whitelist
 %dir %{_sysconfdir}/cobbler/iso
 %config(noreplace) %{_sysconfdir}/cobbler/iso/buildiso.template
+%config(noreplace) %{_sysconfdir}/cobbler/iso/bootinfo.template
 %config(noreplace) %{_sysconfdir}/cobbler/iso/isolinux_menuentry.template
 %config(noreplace) %{_sysconfdir}/cobbler/iso/grub_menuentry.template
 %config(noreplace) %{_sysconfdir}/cobbler/logging_config.conf

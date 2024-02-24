@@ -40,6 +40,8 @@ schema = Schema(
         Optional("bootloaders_modules"): list,
         Optional("bootloaders_shim_folder"): str,
         Optional("bootloaders_shim_file"): str,
+        Optional("secure_boot_grub_folder"): str,
+        Optional("secure_boot_grub_file"): str,
         Optional("bootloaders_ipxe_folder"): str,
         Optional("syslinux_dir"): str,
         Optional("syslinux_memdisk_folder"): str,
@@ -102,8 +104,6 @@ schema = Schema(
         Optional("manage_genders"): bool,
         Optional("manage_rsync"): bool,
         Optional("manage_tftpd"): bool,
-        Optional("mgmt_classes"): [str],
-        Optional("mgmt_parameters"): dict,
         Optional("next_server_v4"): str,
         Optional("next_server_v6"): str,
         Optional("nsupdate_enabled"): bool,
@@ -215,6 +215,8 @@ def migrate(settings: Dict[str, Any]) -> Dict[str, Any]:
 
     # rename keys and update their value if needed
     include = settings.pop("include")
+    include = settings.pop("mgmt_classes")
+    include = settings.pop("mgmt_parameters")
 
     # Do mongodb.conf migration
     mongodb_config = "/etc/cobbler/mongodb.conf"

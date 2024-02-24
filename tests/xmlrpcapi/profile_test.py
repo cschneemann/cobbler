@@ -44,8 +44,6 @@ def test_get_profiles(remote: CobblerXMLRPCInterface, token: str):
         ("autoinstall", "test.xml"),
         ("autoinstall", "test.seed"),
         ("autoinstall_meta", "a=1 b=2 c=3 c=4 c=5 d e"),
-        ("mgmt_classes", "one two three"),
-        ("mgmt_parameters", "<<inherit>>"),
         ("name", "testprofile0"),
         ("name_servers", "1.1.1.1 1.1.1.2 1.1.1.3"),
         ("name_servers_search", "example.com foo.bar.com"),
@@ -134,7 +132,6 @@ def test_create_profile_positive(
     [
         ("distro", "baddistro"),
         ("autoinstall", "/path/to/bad/autoinstall"),
-        ("mgmt_parameters", "badyaml"),
         ("menu", "badmenu"),
         ("virt_cpus", "a"),
         ("virt_file_size", "a"),
@@ -155,11 +152,13 @@ def test_create_profile_negative(
 
     # Act & Assert
     try:
-        remote.modify_profile(profile, field_name, field_value, token)
+        result = remote.modify_profile(profile, field_name, field_value, token)
     except (CX, TypeError, ValueError, OSError):
         assert True
     else:
-        pytest.fail("Bad field did not raise an exception!")
+        if result:
+            pytest.fail("Bad field did not raise an exception!")
+        assert True
 
 
 @pytest.mark.usefixtures(

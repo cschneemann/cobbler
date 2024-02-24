@@ -12,7 +12,7 @@ jobs:
   build-rockylinux8-rpms:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Build a Rocky Linux 8 Package
         shell: 'script -q -e -c "bash {0}"'
         run: |
@@ -26,7 +26,7 @@ jobs:
   build-fedora37-rpms:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Build a Fedora 37 Package
         shell: 'script -q -e -c "bash {0}"'
         run: |
@@ -40,7 +40,7 @@ jobs:
   build-opensuse-leap-rpms:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install System dependencies
         run: sudo apt-get install -y rename
       - name: Build a openSUSE Leap 15.3 Package
@@ -59,7 +59,7 @@ jobs:
   build-opensuse-tumbleweed-rpms:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install System dependencies
         run: sudo apt-get install -y rename
       - name: Build a openSUSE Tumbleweed Package
@@ -78,7 +78,7 @@ jobs:
   build-debian10-debs:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Build a Debian 10 Package
         shell: 'script -q -e -c "bash {0}"'
         run: |
@@ -92,7 +92,7 @@ jobs:
   build-debian11-debs:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Build a Debian 11 Package
         shell: 'script -q -e -c "bash {0}"'
         run: |
@@ -103,11 +103,25 @@ jobs:
           name: debs-debian11
           path: |
             deb-build/DEBS/all/*.deb
+  build-debian12-debs:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build a Debian 12 Package
+        shell: 'script -q -e -c "bash {0}"'
+        run: |
+          ./docker/debs/build-and-install-debs.sh deb12 docker/debs/Debian_12/Debian12.dockerfile
+      - name: Archive DEBs
+        uses: actions/upload-artifact@v3
+        with:
+          name: debs-debian12
+          path: |
+            deb-build/DEBS/all/*.deb
   build-wheel:
     name: Build Python Wheel
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Mark directory as safe for Git
         run: git config --global --add safe.directory /__w/cobbler/cobbler
       - uses: actions/setup-python@v4
@@ -122,6 +136,7 @@ jobs:
           libsasl2-dev
           libldap2-dev
           libssl-dev
+          libsystemd-dev
           tree
       - name: Install dependencies
         run: pip3 install .
@@ -146,10 +161,11 @@ jobs:
       build-opensuse-tumbleweed-rpms,
       build-debian10-debs,
       build-debian11-debs,
+      build-debian12-debs,
       build-wheel
     ]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v3
         name: Download all built artifacts
         with:
@@ -166,6 +182,7 @@ jobs:
           files: |
             artifacts/debs-debian10/*.deb
             artifacts/debs-debian11/*.deb
+            artifacts/debs-debian12/*.deb
             artifacts/rpms-fedora-37/*.rpm
             artifacts/rpms-opensuse-leap/*.rpm
             artifacts/rpms-opensuse-tumbleweed/*.rpm

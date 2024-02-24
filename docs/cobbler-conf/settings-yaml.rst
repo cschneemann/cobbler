@@ -147,13 +147,16 @@ default: ``"/etc/cobbler/boot_loader_conf"``
 bootloaders_dir
 ###############
 
-TODO
+A directory that "cobbler mkloaders" copies the built bootloaders into. "cobbler sync" searches for
+bootloaders in this directory.
+
+default: ``/var/lib/cobbler/loaders``
 
 bootloaders_shim_folder
 #######################
 
 This `Python Glob <https://docs.python.org/3/library/glob.html>`_ will be responsible for finding the installed shim
-folder. If you haven't have shim installed this bootloader link will be skipped. If the Glob is not precise enough a
+folder. If you don't have shim installed this bootloader link will be skipped. If the Glob is not precise enough a
 message will be logged and the link will also be skipped.
 
 default: Depending on your distro. See values below.
@@ -165,7 +168,7 @@ default: Depending on your distro. See values below.
 bootloaders_shim_file
 #####################
 
-This is a `Python Regex <https://docs.python.org/3/library/re.html>`_ which is responsible to find exactly a single
+This is a `Python Regex <https://docs.python.org/3/library/re.html>`_ responsible for finding a single
 match in all files found by the Python Glob in ``bootloaders_shim_folder``. If more or fewer files are found a message
 will be logged.
 
@@ -175,23 +178,82 @@ default: Depending on your distro. See values below.
 * Debian/Ubuntu: ``"shim*.efi.signed"``
 * CentOS/Fedora: ``"shim*.efi"``
 
+secure_boot_grub_folder
+=======================
+
+This `Python Glob <https://docs.python.org/3/library/glob.html>`_ is responsible for finding the installed secure
+boot bootloader folders. If the Glob is not precise enough a message will be logged and the link will also be skipped.
+
+This glob is only used for grub formats that use the ``use_secure_boot_grub`` property.
+
+default: Depending on your distro. See values below.
+
+* (open)SUSE: ``"/usr/share/efi/*/"``
+* Debian/Ubuntu: ``"/usr/lib/shim/"``
+* CentOS/Fedora: ``"/boot/efi/EFI/*/"``
+
+secure_boot_grub_file
+=====================
+
+This is a `Python Regex <https://docs.python.org/3/library/re.html>`_ responsible to finding a single
+match for the secure boot grub bootloader in all files found by the ``secure_boot_grub_folder`` glob.
+
+This regex is only used for grub formats that use the ``use_secure_boot_grub`` property.
+
+default: Depending on your distro. See values below.
+
+* (open)SUSE: ``"grub\.efi"``
+* Debian/Ubuntu: ``"grub[a-zA-Z0-9]*\.efi"``
+* CentOS/Fedora: ``"grub\.efi"``
+
 grub2_mod_dir
 #############
 
-TODO
+The directory where Cobbler looks for GRUB modules that are required for "cobbler mkloaders".
+
+default: Depends on your distribution. See values below.
+
+* (open)SUSE: ``"/usr/share/grub2"``
+* Debian/Ubuntu: ``"/usr/lib/grub"``
+* CentOS/Fedora: ``"/usr/lib/grub"``
 
 syslinux_dir
 ############
 
-TODO
+The directory where Cobbler looks for syslinux modules that are required for "cobbler mkloaders".
+
+default: Depends on your distribution. See values below.
+
+* (open)SUSE: ``"/usr/share/syslinux"``
+* Debian/Ubuntu: ``"/usr/lib/syslinux/modules/bios/"``
+* CentOS/Fedora: ``"/usr/share/syslinux"``
 
 bootloaders_modules
 ###################
 
-TODO
+A list of all modules "cobbler mkloaders" includes when building grub loaders.
+Typically, a grub loader uses the modules for PXE or HTTP Boot.
+
+default: Omited for readablity, please refer to the `settings.yaml` file in our GitHub repository.
 
 bootloaders_formats
 ###################
+
+This is a mapping that has the following structure:
+
+.. code:: yaml
+
+   <loader name>:
+      binary_name: filename
+      extra_modules:
+        - extra-module
+      mod_dir: <different folder name then loader name>
+      use_secure_boot_grub: True
+
+The keys ``extra_modules``, ``mod_dir`` and ``use_secure_boot_grub`` are optional. Under normal circumstances this
+setting does not need adjustments.
+
+default: Omited for readablity, please refer to the `settings.yaml` file in our GitHub repository.
 
 grubconfig_dir
 ##############
@@ -207,21 +269,21 @@ Email out a report when Cobbler finishes installing a system.
 
 - enabled: Set to ``true`` to turn this feature on
 - email: Which addresses to email
-- ignorelist: TODO
+- ignorelist: A list of prefixes that defines mail topics that should not be sent.
 - sender: Optional
 - smtp_server: Used to specify another server for an MTA.
 - subject: Use the default subject unless overridden.
 
 defaults:
 
-.. code:: YAML
+.. code-block:: yaml
 
-    build_reporting_enabled: false
-    build_reporting_sender: ""
-    build_reporting_email: [ 'root@localhost' ]
-    build_reporting_smtp_server: "localhost"
-    build_reporting_subject: ""
-    build_reporting_ignorelist: [ "" ]
+   build_reporting_enabled: false
+   build_reporting_sender: ""
+   build_reporting_email: [ 'root@localhost' ]
+   build_reporting_smtp_server: "localhost"
+   build_reporting_subject: ""
+   build_reporting_ignorelist: [ "" ]
 
 buildisodir
 ###########
@@ -291,10 +353,10 @@ configurations you probably do **not** want to supply this.
 
 defaults:
 
-.. code:: YAML
+.. code-block:: yaml
 
-    default_name_servers: []
-    default_name_servers_search: []
+   default_name_servers: []
+   default_name_servers_search: []
 
 default_ownership
 #################
@@ -432,22 +494,22 @@ using LDAP for WebUI/XML-RPC authentication.
 
 defaults:
 
-.. code::
+.. code-block:: yaml
 
-    ldap_server: "ldap.example.com"
-    ldap_base_dn: "DC=example,DC=com"
-    ldap_port: 389
-    ldap_tls: true
-    ldap_anonymous_bind: true
-    ldap_search_bind_dn: ''
-    ldap_search_passwd: ''
-    ldap_search_prefix: 'uid='
-    ldap_tls_cacertdir: ''
-    ldap_tls_cacertfile: ''
-    ldap_tls_certfile: ''
-    ldap_tls_keyfile: ''
-    ldap_tls_reqcert: 'hard'
-    ldap_tls_cipher_suite: ''
+   ldap_server: "ldap.example.com"
+   ldap_base_dn: "DC=example,DC=com"
+   ldap_port: 389
+   ldap_tls: true
+   ldap_anonymous_bind: true
+   ldap_search_bind_dn: ''
+   ldap_search_passwd: ''
+   ldap_search_prefix: 'uid='
+   ldap_tls_cacertdir: ''
+   ldap_tls_cacertfile: ''
+   ldap_tls_certfile: ''
+   ldap_tls_keyfile: ''
+   ldap_tls_reqcert: 'hard'
+   ldap_tls_cipher_suite: ''
 
 bind_manage_ipmi
 ################
@@ -496,10 +558,10 @@ lists which zones are managed. See :ref:`dns-management` for more information.
 
 defaults:
 
-.. code::
+.. code-block:: yaml
 
-    manage_forward_zones: []
-    manage_reverse_zones: []
+   manage_forward_zones: []
+   manage_reverse_zones: []
 
 manage_genders
 ##############
@@ -533,9 +595,9 @@ parameters work in conjunction with ``--mgmt-classes`` and are described in furt
 
 .. code-block:: YAML
 
-    mgmt_classes: []
-    mgmt_parameters:
-        from_cobbler: true
+   mgmt_classes: []
+   mgmt_parameters:
+       from_cobbler: true
 
 next_server_v4
 ##############
@@ -633,7 +695,7 @@ External proxy which is used by the following commands: ``reposync``, ``signatur
 
 defaults:
 
-.. code::
+.. code-block:: text
 
   http: http://192.168.1.1:8080
   https: https://192.168.1.1:8443
@@ -792,10 +854,10 @@ need to change this.
 
 defaults:
 
-.. code:: YAML
+.. code-block:: YAML
 
-    restart_dns: true
-    restart_dhcp: true
+   restart_dns: true
+   restart_dhcp: true
 
 run_install_triggers
 ####################
@@ -816,12 +878,12 @@ purposes. Git and Mercurial are currently supported, but Git is the recommend SC
 
 default:
 
-.. code:: YAML
+.. code-block:: YAML
 
-    scm_track_enabled: false
-    scm_track_mode: "git"
-    scm_track_author: "cobbler <cobbler@localhost>"
-    scm_push_script: "/bin/true"
+   scm_track_enabled: false
+   scm_track_mode: "git"
+   scm_track_author: "cobbler <cobbler@localhost>"
+   scm_push_script: "/bin/true"
 
 serializer_pretty_json
 ######################
@@ -894,23 +956,23 @@ Directories that will not get wiped and recreated on a ``cobbler sync``.
 
 default:
 
-.. code::
+.. code-block:: yaml
 
-    webdir_whitelist:
-      - misc
-      - web
-      - webui
-      - localmirror
-      - repo_mirror
-      - distro_mirror
-      - images
-      - links
-      - pub
-      - repo_profile
-      - repo_system
-      - svc
-      - rendered
-      - .link_cache
+   webdir_whitelist:
+     - misc
+     - web
+     - webui
+     - localmirror
+     - repo_mirror
+     - distro_mirror
+     - images
+     - links
+     - pub
+     - repo_profile
+     - repo_system
+     - svc
+     - rendered
+     - .link_cache
 
 windows_enabled
 ###############
@@ -1109,6 +1171,7 @@ Choices:
 
 * serializers.file
 * serializers.mongodb
+* serializers.sqlite
 
 default: ``serializers.file``
 

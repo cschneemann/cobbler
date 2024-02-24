@@ -178,7 +178,6 @@ class _IscManager(DhcpManagerModule):
                 interface["owner"] = blended_system["name"]
                 interface["enable_ipxe"] = blended_system["enable_ipxe"]
                 interface["name_servers"] = blended_system["name_servers"]
-                interface["mgmt_parameters"] = blended_system["mgmt_parameters"]
 
                 # For esxi/UEFI export filename_esxi as path to efi bootloader
                 if distro and distro.os_version.startswith("esxi"):
@@ -360,7 +359,6 @@ class _IscManager(DhcpManagerModule):
                 interface["hostname"] = blended_system["hostname"]
                 interface["owner"] = blended_system["name"]
                 interface["name_servers"] = blended_system["name_servers"]
-                interface["mgmt_parameters"] = blended_system["mgmt_parameters"]
 
                 # Explicitly declare filename for other (non x86) archs as in DHCP discover package mostly the
                 # architecture cannot be differed due to missing bits...
@@ -404,7 +402,7 @@ class _IscManager(DhcpManagerModule):
         self.logger.info("generating %s", self.settings_file_v6)
         self.templar.render(template_data, metadata, self.settings_file_v6)
 
-    def restart_dhcp(self, service_name: str) -> int:
+    def restart_dhcp(self, service_name: str, version: int) -> int:
         """
         This syncs the dhcp server with it's new config files.
         Basically this restarts the service to apply the changes.
@@ -416,11 +414,18 @@ class _IscManager(DhcpManagerModule):
             self.logger.error("%s path could not be found", service_name)
             return -1
         return_code_service_restart = utils.subprocess_call(
-            [dhcpd_path, "-t", "-q"], shell=False
+            [dhcpd_path, f"-{version}", "-t", "-q"], shell=False
         )
         if return_code_service_restart != 0:
             self.logger.error("Testing config - %s -t failed", service_name)
-        return_code_service_restart = process_management.service_restart(service_name)
+        if version == 4:
+            return_code_service_restart = process_management.service_restart(
+                service_name
+            )
+        else:
+            return_code_service_restart = process_management.service_restart(
+                f"{service_name}{version}"
+            )
         if return_code_service_restart != 0:
             self.logger.error("%s service failed", service_name)
         return return_code_service_restart
@@ -437,12 +442,11 @@ class _IscManager(DhcpManagerModule):
 
         # Even if one fails, try both and return an error
         ret = 0
+        service = utils.dhcp_service_name()
         if self.settings.manage_dhcp_v4:
-            service_v4 = utils.dhcp_service_name()
-            ret |= self.restart_dhcp(service_v4)
+            ret |= self.restart_dhcp(service, 4)
         if self.settings.manage_dhcp_v6:
-            # TODO: Fix hard coded string
-            ret |= self.restart_dhcp("dhcpd6")
+            ret |= self.restart_dhcp(service, 6)
         return ret
 
 
